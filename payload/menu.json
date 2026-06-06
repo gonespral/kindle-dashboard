@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "name": "kdash",
+      "priority": 100,
+      "items": [
+        {"name": "App: Clock",   "priority": 50, "action": "/bin/sh ./tools/stop.sh; python3 ./cards/clock.py &"},
+        {"name": "App: Weather",      "priority": 49, "action": "/bin/sh ./tools/stop.sh; python3 ./cards/weather.py &"},
+        {"name": "App: Claude Usage", "priority": 48, "action": "/bin/sh ./tools/stop.sh; python3 ./cards/claude_usage.py &"},
+        {"name": "Stop",         "priority": 20, "action": "/bin/sh ./tools/stop.sh"},
+        {"name": "Show IP",      "priority": 15, "action": "/bin/sh ./tools/show_ip.sh"},
+        {"name": "Test Python",  "priority": 10, "action": "/bin/sh ./tools/test-python.sh"},
+        {"name": "Rev Shell",    "priority": 5,  "action": "/bin/sh ./revshell.sh"}
+      ]
+    }
+  ]
+}

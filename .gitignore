@@ -1,0 +1,7 @@
+sync.conf
+scripts/local/
+scripts/logs/
+__pycache__/
+*.pyc
+.pixi/
+pixi.lock
