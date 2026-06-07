@@ -2,6 +2,5 @@ REFRESH_INTERVAL=3600
 WEATHER_CITY=Lisbon                    # city name for the weather card
 SHELL_HOST=192.168.x.x                # your PC's IP for reverse shell
 SHELL_PORT=4568
-ANTHROPIC_ADMIN_API_KEY=sk-ant-admin-...  # org admin key — for usage report (console.anthropic.com)
-ANTHROPIC_API_KEY=sk-ant-api-...         # regular API key — for 5h/7d rate limit display (optional)
+ANTHROPIC_ADMIN_API_KEY=sk-ant-admin-...  # admin key from console.anthropic.com — for Claude usage card
 # KINDLE_MOUNT=/run/media/youruser/Kindle1  # uncomment to override auto-detect
