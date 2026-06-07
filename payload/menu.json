@@ -4,12 +4,14 @@
       "name": "kdash",
       "priority": 100,
       "items": [
-        {"name": "App: Clock",   "priority": 50, "action": "/bin/sh ./tools/stop.sh; python3 ./cards/clock.py &"},
-        {"name": "App: Weather",      "priority": 49, "action": "/bin/sh ./tools/stop.sh; python3 ./cards/weather.py &"},
-        {"name": "App: Claude Usage", "priority": 48, "action": "/bin/sh ./tools/stop.sh; python3 ./cards/claude_usage.py &"},
+        {"name": "App: Clock",        "priority": 50, "action": "/bin/sh ./tools/stop.sh; /bin/sh ./tools/launch.sh ./cards/clock.py"},
+        {"name": "App: Weather",      "priority": 49, "action": "/bin/sh ./tools/stop.sh; /bin/sh ./tools/launch.sh ./cards/weather.py"},
+        {"name": "App: Buienradar",   "priority": 47, "action": "/bin/sh ./tools/stop.sh; /bin/sh ./tools/launch.sh ./cards/buienradar.py"},
+        {"name": "App: Claude Usage", "priority": 48, "action": "/bin/sh ./tools/stop.sh; /bin/sh ./tools/launch.sh ./cards/claude_usage.py"},
         {"name": "Stop",         "priority": 20, "action": "/bin/sh ./tools/stop.sh"},
         {"name": "Show IP",      "priority": 15, "action": "/bin/sh ./tools/show_ip.sh"},
-        {"name": "Test Python",  "priority": 10, "action": "/bin/sh ./tools/test-python.sh"},
+        {"name": "Test Python",  "priority": 10, "action": "/bin/sh ./tools/test_python.sh"},
+        {"name": "Test Touch",   "priority":  9, "action": "/bin/sh ./tools/launch.sh ./tools/test_touch.py"},
         {"name": "Rev Shell",    "priority": 5,  "action": "/bin/sh ./revshell.sh"}
       ]
     }

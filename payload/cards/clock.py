@@ -2,8 +2,9 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from lib import Canvas, font, show_image, prevent_screensaver, sleep_screen, sleep_watcher, log
+from lib import Canvas, font, show_image, sleep_screen, sleep_watcher, tap_watcher, log
 from datetime import datetime
+from PIL import Image
 
 REFRESH = int(os.environ.get('REFRESH_INTERVAL', '120'))
 TMP = '/tmp/kdash_clock.png'
@@ -33,17 +34,16 @@ def render():
     # Week number
     c.text_centered(880, 'Week ' + now.strftime('%V'), font(55))
 
+    c.img = c.img.transpose(Image.ROTATE_90)
     c.save(TMP)
     show_image(TMP)
 
 
-_stop = sleep_watcher()
-while not _stop.is_set():
-    prevent_screensaver()
+_sleep = sleep_watcher()
+_tap   = tap_watcher()
+while not _sleep.is_set() and not _tap.is_set():
     try:
         render()
     except Exception as e:
         log(f"clock error: {e}")
-    if not _stop.is_set():
-        sleep_screen(REFRESH)
-prevent_screensaver(False)
+    sleep_screen(REFRESH, _sleep, _tap)

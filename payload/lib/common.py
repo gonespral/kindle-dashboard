@@ -6,16 +6,19 @@ of silently doing nothing, so you know what would have been called.
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
+import select
 import shutil
 import ssl
+import struct
 import subprocess
 import sys
 import threading
 import time
 import urllib.request
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -105,26 +108,13 @@ def prevent_screensaver(enable: bool = True) -> None:
         print(f"[lipc] error (rc={result.returncode}): preventScreenSaver={int(enable)}")
 
 
-def sleep_screen(seconds: int) -> None:
-    """Suspend the Kindle for `seconds` via RTC wakeup + mem sleep."""
-    prevent_screensaver(False)
-    rtc = "/sys/class/rtc/rtc0/wakealarm"
-    power = "/sys/power/state"
-    if os.path.exists(rtc) and os.path.exists(power):
-        wake_at = int(time.time()) + seconds
-        try:
-            with open(rtc, "w") as f:
-                f.write("0\n")       # clear existing alarm
-            with open(rtc, "w") as f:
-                f.write(f"{wake_at}\n")
-            with open(power, "w") as f:
-                f.write("mem\n")     # suspend-to-RAM; resumes here after wake
-        except OSError as e:
-            print(f"[sleep] suspend failed: {e}; falling back to sleep")
-            time.sleep(seconds)
-    else:
-        print(f"[sleep] {seconds}s (no /sys/power/state on this host)")
-        time.sleep(seconds)
+def sleep_screen(seconds: int, *stop_events: threading.Event) -> None:
+    """Sleep for seconds, waking early if any stop_event is set."""
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if stop_events and any(e.is_set() for e in stop_events):
+            return
+        time.sleep(0.25)
 
 
 def sleep_watcher() -> threading.Event:
@@ -147,6 +137,118 @@ def sleep_watcher() -> threading.Event:
 
     threading.Thread(target=_watch, daemon=True).start()
     return stop
+
+
+# ── Touch input ──────────────────────────────────────────────────────────────
+
+_EV_FMT  = 'llHHi'
+_EV_SIZE = struct.calcsize(_EV_FMT)
+_EV_KEY, _EV_ABS   = 1, 3
+# Kindle touch controller reports code 0x145 (BTN_TOOL_FINGER).
+# value=0 = finger touches screen (DOWN), value=1 = finger lifts (UP).
+_BTN_KINDLE_TOUCH  = 0x145
+_ABS_X, _ABS_Y     = 0x00, 0x01
+_ABS_MT_POSITION_X = 0x35
+_ABS_MT_POSITION_Y = 0x36
+_TOUCH_SKIP  = frozenset(['gpio-keys', 'power', 'keypad', 'hall', 'lid', 'als'])
+_TOUCH_HINTS = ('touch', 'zforce', 'cyttsp', 'elan', 'ft5', 'mt', 'digitizer')
+
+
+def find_touch_device() -> Optional[str]:
+    """Return the /dev/input/eventN path for the touchscreen, or None."""
+    try:
+        raw = open('/proc/bus/input/devices').read()
+    except OSError:
+        return None
+
+    best = None
+    for block in raw.strip().split('\n\n'):
+        name_line = next((l for l in block.splitlines() if l.startswith('N: Name=')), '')
+        name = name_line.split('=', 1)[1].strip('"').lower() if name_line else ''
+        if any(s in name for s in _TOUCH_SKIP):
+            continue
+        handler_line = next((l for l in block.splitlines() if l.startswith('H: Handlers=')), '')
+        event = next((t for t in handler_line.split() if t.startswith('event')), None)
+        if event is None:
+            continue
+        if any(h in name for h in _TOUCH_HINTS):
+            return '/dev/input/' + event  # strong hint — prefer immediately
+        if best is None:
+            best = '/dev/input/' + event  # first non-skip candidate as fallback
+    return best
+
+
+def touch_watcher(
+    on_tap: Optional[Callable[[int, int], None]] = None,
+    device: Optional[str] = None,
+) -> threading.Event:
+    """Start a background thread reading touchscreen events.
+
+    Returns a *stop* Event — set it to shut the watcher down.
+
+    on_tap(x, y): called on each tap-down event (0x145 value=0).
+    device: explicit /dev/input/eventN path; auto-detected if None.
+    """
+    stop = threading.Event()
+
+    def _watch() -> None:
+        path = device or find_touch_device()
+        if path is None:
+            print('[touch] no touch device found')
+            return
+        try:
+            f = open(path, 'rb')
+        except OSError as e:
+            print(f'[touch] cannot open {path}: {e}')
+            return
+
+        last_x = last_y = 0
+        fd = f.fileno()
+        try:
+            while not stop.is_set():
+                ready, _, _ = select.select([fd], [], [], 0.5)
+                if not ready:
+                    continue
+                data = f.read(_EV_SIZE)
+                if len(data) < _EV_SIZE:
+                    continue
+                _, _, ev_type, ev_code, ev_value = struct.unpack(_EV_FMT, data)
+                if ev_type == _EV_ABS:
+                    if ev_code in (_ABS_MT_POSITION_X, _ABS_X):
+                        last_x = ev_value
+                    elif ev_code in (_ABS_MT_POSITION_Y, _ABS_Y):
+                        last_y = ev_value
+                elif ev_type == _EV_KEY and ev_code == _BTN_KINDLE_TOUCH and ev_value == 0:
+                    if on_tap:
+                        on_tap(last_x, last_y)
+        finally:
+            f.close()
+
+    threading.Thread(target=_watch, daemon=True).start()
+    return stop
+
+
+def tap_watcher(device: Optional[str] = None) -> threading.Event:
+    """Return an Event that is set on the first screen tap.
+
+    Works like sleep_watcher(): one-shot, the event stays set after the first tap.
+    Use as a stop condition alongside sleep_watcher():
+
+        _sleep = sleep_watcher()
+        _tap   = tap_watcher()
+        while not _sleep.is_set() and not _tap.is_set():
+            render()
+            sleep_screen(REFRESH, _sleep, _tap)
+    """
+    tapped = threading.Event()
+    _watcher_stop = threading.Event()
+
+    def _on_tap(x: int, y: int) -> None:
+        tapped.set()
+        _watcher_stop.set()  # stop the underlying touch_watcher thread
+
+    touch_watcher(on_tap=_on_tap, device=device)
+    return tapped
 
 
 # ── Network ───────────────────────────────────────────────────────────────────

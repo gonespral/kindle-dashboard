@@ -57,6 +57,11 @@ ICONS = [
     'cyclone',
     'flood',
     'air',
+
+    # Weather stats
+    'device_thermostat',  # feels-like temperature
+    'humidity_percentage',  # humidity
+    'location_on',        # city name
 ]
 
 SIZE = 256

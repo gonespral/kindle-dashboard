@@ -1,6 +1,6 @@
 sync.conf
-scripts/local/
-scripts/logs/
+payload/local/
+payload/logs/
 __pycache__/
 *.pyc
 .pixi/
