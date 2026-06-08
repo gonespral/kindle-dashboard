@@ -2,8 +2,8 @@
 set -e
 
 # Load config
-if [ -f "$(dirname "$0")/sync.conf" ]; then
-  . "$(dirname "$0")/sync.conf"
+if [ -f "$(dirname "$0")/env" ]; then
+  . "$(dirname "$0")/env"
 fi
 
 REFRESH_INTERVAL="${REFRESH_INTERVAL:-3600}"
@@ -12,16 +12,21 @@ BUIENALARM_POSTCODE="${BUIENALARM_POSTCODE:-}"
 SCRIPTS_DIR="$(cd "$(dirname "$0")/payload" && pwd)"
 
 # Find Kindle mount
-find_kindle() {
-  for p in "$KINDLE_MOUNT" /run/media/*/Kindle* /media/*/Kindle* /Volumes/Kindle; do
-    [ -n "$p" ] && [ -w "$p" ] && echo "$p" && return
+if [ -n "$KINDLE_MOUNT" ]; then
+  if [ ! -w "$KINDLE_MOUNT" ]; then
+    echo "error: KINDLE_MOUNT=$KINDLE_MOUNT is not writable (Kindle not mounted there?)"
+    exit 1
+  fi
+  KINDLE="$KINDLE_MOUNT"
+else
+  KINDLE=""
+  for p in /run/media/*/Kindle* /media/*/Kindle* /Volumes/Kindle; do
+    [ -w "$p" ] && KINDLE="$p" && break
   done
-}
-
-KINDLE="$(find_kindle)"
-if [ -z "$KINDLE" ]; then
-  echo "Kindle not found. Connect via USB and unlock it."
-  exit 1
+  if [ -z "$KINDLE" ]; then
+    echo "error: Kindle not found. Connect via USB and unlock it, or set KINDLE_MOUNT in env"
+    exit 1
+  fi
 fi
 
 DEST="$KINDLE/extensions/kdash"
@@ -38,6 +43,12 @@ export SHELL_HOST=${SHELL_HOST:-}
 export SHELL_PORT=${SHELL_PORT:-4568}
 export ANTHROPIC_ADMIN_API_KEY=${ANTHROPIC_ADMIN_API_KEY:-}
 export BUIENALARM_POSTCODE=$BUIENALARM_POSTCODE
+export DISABLE_USB_WAKEUP=${DISABLE_USB_WAKEUP:-false}
+export ICAL_URL=${ICAL_URL:-}
+export ICAL_URL_1=${ICAL_URL_1:-}
+export ICAL_URL_2=${ICAL_URL_2:-}
+export ICAL_URL_3=${ICAL_URL_3:-}
+export ICAL_URL_4=${ICAL_URL_4:-}
 EOF
 
 find "$DEST" -name "*.sh" -exec chmod 755 {} \;

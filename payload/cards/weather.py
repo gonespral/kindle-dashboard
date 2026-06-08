@@ -2,13 +2,12 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from lib import Canvas, font, show_image, sleep_screen, sleep_watcher, tap_watcher, fetch_json, log
+from lib import Canvas, font, fetch_json, log
+from lib.card import Card
 from datetime import datetime
 from PIL import Image
 
-CITY = os.environ.get('WEATHER_CITY', 'Delft')
-REFRESH = int(os.environ.get('REFRESH_INTERVAL', '3600'))
-TMP = '/tmp/kdash_weather.png'
+CITY      = os.environ.get('WEATHER_CITY', 'Delft')
 ICONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'icons')
 
 
@@ -100,29 +99,10 @@ def icon_for(code: int, period: str) -> str:
     return 'rainy'
 
 
-# ── Fetch ─────────────────────────────────────────────────────────────────────
+# ── Render helpers ────────────────────────────────────────────────────────────
 
-def fetch():
-    log(f"weather: fetching {CITY}...")
-    url = f'http://wttr.in/{CITY}?format=j1'
-    data = fetch_json(url)
-    cur = data['current_condition'][0]
-    astro = data['weather'][0]['astronomy'][0]
-    return {
-        'temp':     cur['temp_C'] + '°C',
-        'feels':    cur['FeelsLikeC'] + '°C',
-        'desc':     cur['weatherDesc'][0]['value'],
-        'humidity': cur['humidity'] + '%',
-        'wind':     cur['windspeedKmph'] + ' km/h',
-        'code':     int(cur['weatherCode']),
-        'period':   sky_period(astro),
-    }
-
-
-# ── Render ────────────────────────────────────────────────────────────────────
-
-ICON_SM = 60   # size of stat icons
-ICON_GAP = 10  # gap between icon and value text
+ICON_SM  = 60
+ICON_GAP = 10
 
 
 def _icn(name: str) -> str:
@@ -130,7 +110,6 @@ def _icn(name: str) -> str:
 
 
 def _stat_left(c, x: int, y: int, icon_name: str, value: str) -> None:
-    """Draw [icon] value left-aligned at (x, y)."""
     fnt = font(55)
     p = _icn(icon_name)
     if os.path.exists(p):
@@ -141,7 +120,6 @@ def _stat_left(c, x: int, y: int, icon_name: str, value: str) -> None:
 
 
 def _stat_right(c, x: int, y: int, icon_name: str, value: str) -> None:
-    """Draw [icon] value right-justified to x."""
     fnt = font(55)
     vw, _ = c.measure(value, fnt)
     p = _icn(icon_name)
@@ -151,50 +129,61 @@ def _stat_right(c, x: int, y: int, icon_name: str, value: str) -> None:
     c.text_right(x, y, value, fnt)
 
 
-def render(w):
-    icon_name = icon_for(w['code'], w['period'])
-    log(f"weather: {w['period']} {icon_name} {w['temp']} {w['desc']}")
+# ── Card ──────────────────────────────────────────────────────────────────────
 
-    c = Canvas()
+class WeatherCard(Card):
+    name = 'weather'
+    default_refresh = 3600
 
-    # Condition icon
-    if os.path.exists(_icn(icon_name)):
-        c.paste_icon(_icn(icon_name), cx=724, cy=130, size=200)
+    def fetch(self) -> dict:
+        log(f"weather: fetching {CITY}...")
+        url = f'http://wttr.in/{CITY}?format=j1'
+        data = fetch_json(url)
+        cur  = data['current_condition'][0]
+        astro = data['weather'][0]['astronomy'][0]
+        return {
+            'temp':     cur['temp_C'] + '°C',
+            'feels':    cur['FeelsLikeC'] + '°C',
+            'desc':     cur['weatherDesc'][0]['value'],
+            'humidity': cur['humidity'] + '%',
+            'wind':     cur['windspeedKmph'] + ' km/h',
+            'code':     int(cur['weatherCode']),
+            'period':   sky_period(astro),
+        }
 
-    # City with location pin
-    loc_path = _icn('location_on')
-    city_fnt = font(80, bold=True)
-    if os.path.exists(loc_path):
-        pin_sz = 60
-        cw, _ = c.measure(CITY, city_fnt)
-        block_w = pin_sz + 8 + cw
-        bx = (c.w - block_w) // 2
-        c.paste_icon(loc_path, cx=bx + pin_sz // 2, cy=268, size=pin_sz)
-        c.text(bx + pin_sz + 8, 240, CITY, city_fnt)
-    else:
-        c.text_centered(240, CITY, city_fnt)
+    def render(self, data: dict) -> Canvas:
+        icon_name = icon_for(data['code'], data['period'])
+        log(f"weather: {data['period']} {icon_name} {data['temp']} {data['desc']}")
 
-    c.text_centered(355, w['temp'],  font(220, bold=True))
-    c.text_centered(620, w['desc'],  font(65))
+        c = Canvas()
 
-    c.divider(710)
+        if os.path.exists(_icn(icon_name)):
+            c.paste_icon(_icn(icon_name), cx=724, cy=130, size=200)
 
-    _stat_left(c,  200, 750, 'device_thermostat',  w['feels'])
-    _stat_left(c,  200, 855, 'humidity_percentage', w['humidity'])
-    _stat_right(c, 1248, 750, 'air',               w['wind'])
+        loc_path = _icn('location_on')
+        city_fnt = font(80, bold=True)
+        if os.path.exists(loc_path):
+            pin_sz = 60
+            cw, _ = c.measure(CITY, city_fnt)
+            block_w = pin_sz + 8 + cw
+            bx = (c.w - block_w) // 2
+            c.paste_icon(loc_path, cx=bx + pin_sz // 2, cy=268, size=pin_sz)
+            c.text(bx + pin_sz + 8, 240, CITY, city_fnt)
+        else:
+            c.text_centered(240, CITY, city_fnt)
 
-    c.img = c.img.transpose(Image.ROTATE_90)
-    c.save(TMP)
-    show_image(TMP)
+        c.text_centered(355, data['temp'],  font(220, bold=True))
+        c.text_centered(620, data['desc'],  font(65))
+
+        c.divider(710)
+
+        _stat_left(c,  200, 750, 'device_thermostat',  data['feels'])
+        _stat_left(c,  200, 855, 'humidity_percentage', data['humidity'])
+        _stat_right(c, 1248, 750, 'air',               data['wind'])
+
+        c.img = c.img.transpose(Image.ROTATE_90)
+        return c
 
 
-# ── Loop ──────────────────────────────────────────────────────────────────────
-
-_sleep = sleep_watcher()
-_tap   = tap_watcher()
-while not _sleep.is_set() and not _tap.is_set():
-    try:
-        render(fetch())
-    except Exception as e:
-        log(f"weather error: {e}")
-    sleep_screen(REFRESH, _sleep, _tap)
+if __name__ == '__main__':
+    WeatherCard().run()

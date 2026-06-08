@@ -1,4 +1,4 @@
-sync.conf
+env
 payload/local/
 payload/logs/
 __pycache__/

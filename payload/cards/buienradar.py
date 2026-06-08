@@ -10,14 +10,13 @@ import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from lib import Canvas, font, log, prevent_screensaver, show_image, sleep_screen
+from lib import Canvas, font, log
+from lib.card import Card
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 POSTCODE  = os.environ.get('BUIENALARM_POSTCODE', '')
 _LAT      = os.environ.get('BUIENALARM_LAT', '')
 _LON      = os.environ.get('BUIENALARM_LON', '')
-REFRESH   = int(os.environ.get('REFRESH_INTERVAL', '600'))
-TMP       = '/tmp/kdash_buienradar.png'
 ICONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'icons')
 
 GEOCODE_URL = ('https://nominatim.openstreetmap.org/search'
@@ -29,7 +28,7 @@ def resolve_coords() -> tuple:
     if _LAT and _LON:
         return float(_LAT), float(_LON)
     if not POSTCODE:
-        raise RuntimeError('Set BUIENALARM_POSTCODE (and optionally LAT/LON) in sync.conf')
+        raise RuntimeError('Set BUIENALARM_POSTCODE (and optionally LAT/LON) in env')
     log(f'buienradar: geocoding {POSTCODE}...')
     url = GEOCODE_URL.format(postcode=POSTCODE.replace(' ', '+'))
     ctx = ssl._create_unverified_context()
@@ -39,6 +38,7 @@ def resolve_coords() -> tuple:
     if not results:
         raise RuntimeError(f'Postcode {POSTCODE} not found via Nominatim')
     return float(results[0]['lat']), float(results[0]['lon'])
+
 
 # NL radar image geographic bounds (from buienradar.nl gadget source)
 RADAR_LON_START = 0.0
@@ -60,8 +60,8 @@ def _fetch(url: str, timeout: int = 20) -> bytes:
         return r.read()
 
 
-def fetch_rain() -> list:
-    text = _fetch(RAIN_URL.format(lat=LAT, lon=LON)).decode()
+def fetch_rain(lat: float, lon: float) -> list:
+    text = _fetch(RAIN_URL.format(lat=lat, lon=lon)).decode()
     result = []
     for line in text.strip().splitlines():
         if '|' not in line:
@@ -208,7 +208,7 @@ def icon_for(v: int) -> str:
     return 'umbrella'
 
 
-def render(rain: list, radar: Image.Image) -> None:
+def _build_canvas(rain: list, radar: Image.Image) -> Canvas:
     c = Canvas()
 
     # ── Header ──────────────────────────────────────────────────────────────
@@ -223,7 +223,6 @@ def render(rain: list, radar: Image.Image) -> None:
            fill=None, outline=150, width=2)
     c.img.paste(radar, (MAP_X, MAP_Y))
 
-    # Map caption
     c.text(MAP_X, MAP_Y + MAP_SIZE + 8, '~200 km radius', font(30), color=160)
 
     # ── Column divider ───────────────────────────────────────────────────────
@@ -266,20 +265,34 @@ def render(rain: list, radar: Image.Image) -> None:
     c.text_right(1368, 1025, 'buienradar.nl', font(35), color=150)
 
     c.img = c.img.transpose(Image.ROTATE_90)
-    c.save(TMP)
-    show_image(TMP)
+    return c
 
 
-LAT, LON = resolve_coords()
-log(f'buienradar: {POSTCODE} → {LAT:.4f},{LON:.4f}')
+class BuienradarCard(Card):
+    name = 'buienradar'
+    default_refresh = 600
+    use_prevent_screensaver = True
 
-while True:
-    prevent_screensaver()
-    try:
-        rain  = fetch_rain()
-        radar = radar_crop(fetch_radar(), LAT, LON)
+    def __init__(self):
+        super().__init__()
+        self.lat, self.lon = resolve_coords()
+        log(f'buienradar: {POSTCODE} → {self.lat:.4f},{self.lon:.4f}')
+
+    def fetch(self) -> dict:
+        rain  = fetch_rain(self.lat, self.lon)
+        radar = radar_crop(fetch_radar(), self.lat, self.lon)
         log(f'buienradar: {intensity_label(rain[0]["value"])} ({rain[0]["value"]})')
-        render(rain, radar)
-    except Exception as e:
-        log(f'buienradar error: {e}')
-    sleep_screen(REFRESH)
+        return {'rain': rain, 'radar': radar}
+
+    def render(self, data: dict) -> Canvas:
+        return _build_canvas(data['rain'], data['radar'])
+
+    def data_changed(self, old: dict | None, new: dict) -> bool:
+        # PIL Image is not equality-comparable; compare rain values only
+        if old is None:
+            return True
+        return old['rain'] != new['rain']
+
+
+if __name__ == '__main__':
+    BuienradarCard().run()

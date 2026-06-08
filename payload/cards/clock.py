@@ -2,48 +2,37 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from lib import Canvas, font, show_image, sleep_screen, sleep_watcher, tap_watcher, log
+from lib import Canvas, font, log
+from lib.card import Card
 from datetime import datetime
 from PIL import Image
 
-REFRESH = int(os.environ.get('REFRESH_INTERVAL', '120'))
-TMP = '/tmp/kdash_clock.png'
+
+class ClockCard(Card):
+    name = 'clock'
+    default_refresh = 60
+    sync_to_minute = True
+
+    def fetch(self) -> dict:
+        return {'now': datetime.now()}
+
+    def render(self, data: dict) -> Canvas:
+        now = data['now']
+        log(f"clock: rendering {now.strftime('%H:%M')}")
+
+        c = Canvas()
+
+        c.text_centered(100, now.strftime('%A').upper(), font(80))
+        c.hline(260, 80, 1368, color=150, width=2)
+        c.text_centered(290, now.strftime('%H:%M'), font(310, bold=True))
+        c.hline(665, 80, 1368, color=150, width=2)
+        c.text_centered(705, now.strftime('%d %B %Y'), font(80))
+        c.hline(845, 80, 1368, color=210, width=1)
+        c.text_centered(880, 'Week ' + now.strftime('%V'), font(55))
+
+        c.img = c.img.transpose(Image.ROTATE_90)
+        return c
 
 
-def render():
-    now = datetime.now()
-    log(f"clock: rendering {now.strftime('%H:%M')}")
-
-    c = Canvas()
-
-    # Day of week — small header
-    c.text_centered(100, now.strftime('%A').upper(), font(80))
-
-    c.hline(260, 80, 1368, color=150, width=2)
-
-    # Time — dominant
-    c.text_centered(290, now.strftime('%H:%M'), font(310, bold=True))
-
-    c.hline(665, 80, 1368, color=150, width=2)
-
-    # Date
-    c.text_centered(705, now.strftime('%d %B %Y'), font(80))
-
-    c.hline(845, 80, 1368, color=210, width=1)
-
-    # Week number
-    c.text_centered(880, 'Week ' + now.strftime('%V'), font(55))
-
-    c.img = c.img.transpose(Image.ROTATE_90)
-    c.save(TMP)
-    show_image(TMP)
-
-
-_sleep = sleep_watcher()
-_tap   = tap_watcher()
-while not _sleep.is_set() and not _tap.is_set():
-    try:
-        render()
-    except Exception as e:
-        log(f"clock error: {e}")
-    sleep_screen(REFRESH, _sleep, _tap)
+if __name__ == '__main__':
+    ClockCard().run()

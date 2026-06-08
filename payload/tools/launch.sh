@@ -101,6 +101,7 @@ if [ "$RC" -ne 0 ]; then
 fi
 
 # ── 5. Launch — detached from KUAL's process group ────────────────────────────
+eips -c 2>/dev/null || true
 say "detaching..."
 
 # Try setsid first (BusyBox has it); fall back to subshell orphan trick

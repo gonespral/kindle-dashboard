@@ -117,6 +117,47 @@ def sleep_screen(seconds: int, *stop_events: threading.Event) -> None:
         time.sleep(0.25)
 
 
+def usb_storage_watcher() -> threading.Event:
+    """Return an Event that is set when the Kindle enters USB drive mode.
+
+    Two parallel mechanisms for reliability:
+    - lipc: waits for com.lab126.volumd usbMSCStart
+    - fs poll: detects /mnt/us being unmounted (device number changes)
+
+    On non-Kindle hosts the event is never set.
+    """
+    activated = threading.Event()
+
+    def _watch_lipc() -> None:
+        if shutil.which('lipc-wait-event') is None:
+            return
+        subprocess.run(
+            ['lipc-wait-event', 'com.lab126.volumd', 'usbMSCStart'],
+            capture_output=True,
+        )
+        activated.set()
+
+    def _watch_fs() -> None:
+        marker = '/mnt/us'
+        if not os.path.exists(marker):
+            return
+        try:
+            dev = os.stat(marker).st_dev
+        except OSError:
+            return
+        while not activated.is_set():
+            time.sleep(3)
+            try:
+                if os.stat(marker).st_dev != dev:
+                    activated.set()
+            except OSError:
+                activated.set()
+
+    threading.Thread(target=_watch_lipc, daemon=True).start()
+    threading.Thread(target=_watch_fs,   daemon=True).start()
+    return activated
+
+
 def sleep_watcher() -> threading.Event:
     """Return an Event that gets set when the Kindle fires the goingToSleep LIPC event.
 
@@ -253,41 +294,73 @@ def tap_watcher(device: Optional[str] = None) -> threading.Event:
 
 # ── Network ───────────────────────────────────────────────────────────────────
 
-def fetch_json(url: str, timeout: int = 15, verify_ssl: bool = False,
-               headers: dict | None = None, body: dict | None = None) -> dict:
-    """Fetch a URL and return parsed JSON. Uses stdlib only.
-    verify_ssl=False by default — Kindle's CA bundle is too old for most sites.
-    Pass body dict to make a POST request with JSON body.
-    """
+def _http_request(url: str, timeout: int, verify_ssl: bool,
+                  headers: dict | None, body: bytes | None,
+                  retries: int) -> bytes:
+    """Low-level HTTP helper with retry/backoff. Raises on final failure."""
     h = {"User-Agent": "kdash/1.0"}
     if headers:
         h.update(headers)
-    data = None
     if body is not None:
-        data = json.dumps(body).encode()
-        h["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, headers=h, data=data)
+        h.setdefault("Content-Type", "application/json")
     ctx = ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
-    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-        return json.loads(resp.read().decode())
+    last_exc: Exception = RuntimeError("no attempts")
+    for attempt in range(retries + 1):
+        try:
+            req = urllib.request.Request(url, headers=h, data=body)
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+                return resp.read()
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retries:
+                time.sleep(2 ** attempt)  # 1 s, 2 s, …
+    raise last_exc
+
+
+def fetch_url(url: str, timeout: int = 20, verify_ssl: bool = False,
+              headers: dict | None = None, retries: int = 2) -> str:
+    """Fetch a URL and return the response body as text. Retries on failure."""
+    raw = _http_request(url, timeout, verify_ssl, headers, None, retries)
+    return raw.decode('utf-8', errors='replace')
+
+
+def fetch_json(url: str, timeout: int = 15, verify_ssl: bool = False,
+               headers: dict | None = None, body: dict | None = None,
+               retries: int = 2) -> dict:
+    """Fetch a URL and return parsed JSON. Retries on failure.
+    verify_ssl=False by default — Kindle's CA bundle is too old for most sites.
+    Pass body dict to make a POST request with JSON body.
+    """
+    encoded = json.dumps(body).encode() if body is not None else None
+    raw = _http_request(url, timeout, verify_ssl, headers, encoded, retries)
+    return json.loads(raw.decode())
 
 
 def fetch_json_with_headers(url: str, timeout: int = 15, verify_ssl: bool = False,
                             headers: dict | None = None,
-                            body: dict | None = None) -> tuple:
+                            body: dict | None = None,
+                            retries: int = 2) -> tuple:
     """Like fetch_json but also returns response headers as a dict."""
     h = {"User-Agent": "kdash/1.0"}
     if headers:
         h.update(headers)
-    data = None
+    encoded = None
     if body is not None:
-        data = json.dumps(body).encode()
+        encoded = json.dumps(body).encode()
         h["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, headers=h, data=data)
     ctx = ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
-    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-        resp_headers = {k.lower(): v for k, v in resp.info().items()}
-        return json.loads(resp.read().decode()), resp_headers
+    last_exc: Exception = RuntimeError("no attempts")
+    for attempt in range(retries + 1):
+        try:
+            req = urllib.request.Request(url, headers=h, data=encoded)
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+                resp_headers = {k.lower(): v for k, v in resp.info().items()}
+                return json.loads(resp.read().decode()), resp_headers
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retries:
+                time.sleep(2 ** attempt)
+    raise last_exc
 
 
 # ── Fonts ─────────────────────────────────────────────────────────────────────
