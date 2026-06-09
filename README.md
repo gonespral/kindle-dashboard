@@ -1,6 +1,6 @@
 # kdash
 
-Kindle e-ink dashboard. Scripts run directly on the Kindle — no server needed.
+Kindle e-ink dashboard. Scripts run directly on the Kindle.
 
 ## Requirements
 
