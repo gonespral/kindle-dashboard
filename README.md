@@ -63,7 +63,7 @@ Launch from KUAL → **kdash**:
 
 ### Card behaviour
 
-Each card runs a loop: **fetch → render → sleep → repeat**. During the sleep it stays alive and responsive — power button press or a screen tap exits cleanly. The refresh interval can be overridden globally with `REFRESH_INTERVAL` in `env`.
+Each card runs a loop: **fetch → render → sleep → repeat**. During the sleep it stays alive and responsive. Power button press or a screen tap exits cleanly. The refresh interval can be overridden globally with `REFRESH_INTERVAL` in `env`.
 
 If battery drops to 25% or below, a small battery indicator is drawn in the corner of whichever card is displayed.
 
@@ -112,7 +112,7 @@ If battery drops to 25% or below, a small battery indicator is drawn in the corn
 
 ## Remote shell (instead of SSH)
 
-SSH setup on Kindle is unreliable. The reverse shell is simpler — the Kindle connects out to your PC.
+SSH setup on Kindle is unreliable. The reverse shell is simpler as the Kindle connects out to your PC.
 
 **Setup:** set `SHELL_HOST` and `SHELL_PORT` in `env`, then sync.
 
@@ -123,6 +123,6 @@ SSH setup on Kindle is unreliable. The reverse shell is simpler — the Kindle c
    stty raw -echo; nc -lvp 4568; stty sane
    ```
 2. On Kindle: KUAL → kdash → Reverse Shell
-3. The Kindle connects back — you get a full interactive shell
+3. The Kindle connects back you get a full interactive shell
 
 The script retries twice (5s apart) if the connection fails. Make sure your PC is listening before tapping the menu entry. `stty sane` restores your terminal after you disconnect.
