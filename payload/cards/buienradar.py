@@ -21,14 +21,21 @@ ICONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'icons')
 
 GEOCODE_URL = ('https://nominatim.openstreetmap.org/search'
                '?postalcode={postcode}&country=NL&format=json&limit=1')
+COORDS_CACHE = '/tmp/kdash_buienradar_coords.json'
 
 
 def resolve_coords() -> tuple:
-    """Return (lat, lon) — from env vars if set, otherwise geocode the postcode."""
+    """Return (lat, lon) — from env vars, /tmp cache, or geocode the postcode."""
     if _LAT and _LON:
         return float(_LAT), float(_LON)
     if not POSTCODE:
         raise RuntimeError('Set BUIENALARM_POSTCODE (and optionally LAT/LON) in env')
+    try:
+        d = json.loads(open(COORDS_CACHE).read())
+        if d.get('postcode') == POSTCODE:
+            return float(d['lat']), float(d['lon'])
+    except Exception:
+        pass
     log(f'buienradar: geocoding {POSTCODE}...')
     url = GEOCODE_URL.format(postcode=POSTCODE.replace(' ', '+'))
     ctx = ssl._create_unverified_context()
@@ -37,7 +44,13 @@ def resolve_coords() -> tuple:
         results = json.loads(r.read().decode())
     if not results:
         raise RuntimeError(f'Postcode {POSTCODE} not found via Nominatim')
-    return float(results[0]['lat']), float(results[0]['lon'])
+    lat, lon = float(results[0]['lat']), float(results[0]['lon'])
+    try:
+        with open(COORDS_CACHE, 'w') as f:
+            json.dump({'postcode': POSTCODE, 'lat': lat, 'lon': lon}, f)
+    except Exception:
+        pass
+    return lat, lon
 
 
 # NL radar image geographic bounds (from buienradar.nl gadget source)
@@ -275,10 +288,14 @@ class BuienradarCard(Card):
 
     def __init__(self):
         super().__init__()
-        self.lat, self.lon = resolve_coords()
-        log(f'buienradar: {POSTCODE} → {self.lat:.4f},{self.lon:.4f}')
+        # Coords resolved lazily in fetch(): a network hiccup at launch must
+        # not kill the process — the run loop retries fetch() every cycle.
+        self.lat = self.lon = None
 
     def fetch(self) -> dict:
+        if self.lat is None:
+            self.lat, self.lon = resolve_coords()
+            log(f'buienradar: {POSTCODE} → {self.lat:.4f},{self.lon:.4f}')
         rain  = fetch_rain(self.lat, self.lon)
         radar = radar_crop(fetch_radar(), self.lat, self.lon)
         log(f'buienradar: {intensity_label(rain[0]["value"])} ({rain[0]["value"]})')
