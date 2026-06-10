@@ -51,21 +51,23 @@ Confirmed working: **Python 3.9.8**, **PIL 9.0.0**
 
 Launch from KUAL -> **kdash**:
 
-| Entry | Refresh | Description |
-|---|---|---|
-| Clock | 1 min | Large centered clock with date and week number |
-| World Clocks | 1 min | Local time plus four configurable time zones |
-| Weather | 1 hr | Current weather via wttr.in (city from `WEATHER_CITY`) |
-| Claude Usage | 10 min | Claude Code session/commit/cost stats for today |
-| Buienradar | 10 min | Dutch rain radar map + 2-hour forecast chart |
-| Claude Quota | 5 min | Claude subscription quota: 5-hour + 7-day utilization rings |
-| Calendar | 1 min | Agenda from one or more iCal feeds (`ICAL_URL*`) |
-| Stop | - | Kill all running cards, clear screen |
-| Tools → Sleep Test | - | Test sleep/wake event handling |
-| Tools → Show IP | - | Display Kindle's IP address |
-| Tools → Test Python | - | Show Python and PIL version on screen |
-| Tools → Test Touch | - | Show touch events on screen |
-| Tools → Rev Shell | - | Open a shell session back to your PC |
+| Entry | Refresh | Description | Preview |
+|---|---|---|---|
+| Clock | 1 min | Large centered clock with date and week number | <img src="docs/screenshots/clock.png" width="280"> |
+| World Clocks | 1 min | Local time plus four configurable time zones | <img src="docs/screenshots/worldclocks.png" width="280"> |
+| Weather | 1 hr | Current weather via wttr.in (city from `WEATHER_CITY`) | <img src="docs/screenshots/weather.png" width="280"> |
+| Claude Usage | 10 min | Claude Code session/commit/cost stats for today | <img src="docs/screenshots/claude_usage.png" width="280"> |
+| Buienradar | 10 min | Dutch rain radar map + 2-hour forecast chart | <img src="docs/screenshots/buienradar.png" width="280"> |
+| Claude Quota | 5 min | Claude subscription quota: 5-hour + 7-day utilization rings | <img src="docs/screenshots/claude_quota.png" width="280"> |
+| Calendar | 1 min | Agenda from one or more iCal feeds (`ICAL_URL*`) | <img src="docs/screenshots/cal.png" width="280"> |
+| Stop | - | Kill all running cards, clear screen | - |
+| Tools → Sleep Test | - | Test sleep/wake event handling | - |
+| Tools → Show IP | - | Display Kindle's IP address | - |
+| Tools → Test Python | - | Show Python and PIL version on screen | - |
+| Tools → Test Touch | - | Show touch events on screen | - |
+| Tools → Rev Shell | - | Open a shell session back to your PC | - |
+
+Screenshots are generated with `python3 make_screenshots.py` (uses your `env` for live data; calendar events are synthetic).
 
 ### Card behaviour
 
