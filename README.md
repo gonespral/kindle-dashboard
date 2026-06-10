@@ -1,6 +1,7 @@
 # kdash
 
 Kindle e-ink dashboard. Scripts run directly on the Kindle.
+Kindle e-ink dashboard. Scripts run directly on the Kindle.
 
 ## Requirements
 
