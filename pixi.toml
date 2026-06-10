@@ -7,3 +7,5 @@ platforms = ["linux-64", "osx-arm64", "osx-64"]
 [dependencies]
 python = "3.9.*"
 pillow = "9.0.*"
+fonttools = "*"
+brotli-python = "*"

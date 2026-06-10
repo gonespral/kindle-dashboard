@@ -91,10 +91,15 @@ def scroll(first_row: int, last_row: int) -> None:
     _eips("-z", str(first_row), str(last_row))
 
 
+# KDASH_DEBUG=false suppresses on-screen log lines (stdout logging is unaffected)
+_DEBUG = os.environ.get('KDASH_DEBUG', 'true').lower() not in ('0', 'false', 'no')
+
+
 def log(msg: str, row: int = 0) -> None:
     """Print to stdout and display on eips row (for on-device debugging)."""
     print(msg)
-    _eips("0", str(row), msg[:60])  # eips truncates long lines anyway
+    if _DEBUG:
+        _eips("0", str(row), msg[:60])  # eips truncates long lines anyway
 
 
 def prevent_screensaver(enable: bool = True) -> None:

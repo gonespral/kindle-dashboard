@@ -1,12 +1,11 @@
 #!/bin/sh
 set -e
 
-# Load config
+# Load env vars
 if [ -f "$(dirname "$0")/env" ]; then
   . "$(dirname "$0")/env"
 fi
 
-REFRESH_INTERVAL="${REFRESH_INTERVAL:-3600}"
 WEATHER_CITY="${WEATHER_CITY:-Delft}"
 BUIENALARM_POSTCODE="${BUIENALARM_POSTCODE:-}"
 SCRIPTS_DIR="$(cd "$(dirname "$0")/payload" && pwd)"
@@ -37,13 +36,15 @@ cp -r "$SCRIPTS_DIR/." "$DEST"
 
 mkdir -p "$DEST/local"
 cat > "$DEST/local/env.sh" <<EOF
-export REFRESH_INTERVAL=$REFRESH_INTERVAL
+${REFRESH_INTERVAL:+export REFRESH_INTERVAL=$REFRESH_INTERVAL}
 export WEATHER_CITY=$WEATHER_CITY
 export SHELL_HOST=${SHELL_HOST:-}
 export SHELL_PORT=${SHELL_PORT:-4568}
 export ANTHROPIC_ADMIN_API_KEY=${ANTHROPIC_ADMIN_API_KEY:-}
+export CLAUDE_OAUTH_TOKEN=${CLAUDE_OAUTH_TOKEN:-}
+export CLAUDE_REFRESH_TOKEN=${CLAUDE_REFRESH_TOKEN:-}
 export BUIENALARM_POSTCODE=$BUIENALARM_POSTCODE
-export DISABLE_USB_WAKEUP=${DISABLE_USB_WAKEUP:-false}
+export KDASH_DEBUG=${KDASH_DEBUG:-true}
 export ICAL_URL=${ICAL_URL:-}
 export ICAL_URL_1=${ICAL_URL_1:-}
 export ICAL_URL_2=${ICAL_URL_2:-}

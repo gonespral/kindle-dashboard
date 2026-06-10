@@ -1,4 +1,7 @@
 env
+tmp/
+# Anthropic brand fonts (proprietary, fetched via ./fetch_fonts.sh)
+payload/fonts/Claude*.ttf
 payload/local/
 payload/logs/
 __pycache__/

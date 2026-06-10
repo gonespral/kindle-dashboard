@@ -17,10 +17,13 @@ A self-hosted Kindle e-ink dashboard. Cards run as Python scripts directly on th
 | `payload/lib/card.py` | `Card` base class — fetch/render loop, sleep, signal handling, battery overlay |
 | `payload/lib/common.py` | eips helpers, `Canvas`, `sleep_watcher`, `tap_watcher`, `sleep_screen`, `fetch_json`, `font` |
 | `payload/lib/__init__.py` | Re-exports everything from `lib.common` and `lib.card` |
-| `payload/cards/clock.py` | Clock card (2 min refresh) |
+| `payload/cards/clock.py` | Clock card (1 min, minute-synced) |
+| `payload/cards/worldclocks.py` | World clocks card (1 min, minute-synced) |
 | `payload/cards/weather.py` | Weather card via wttr.in (1 hr refresh) |
 | `payload/cards/buienradar.py` | Dutch rain radar + forecast (10 min refresh) |
 | `payload/cards/claude_usage.py` | Claude Code usage stats (10 min refresh) |
+| `payload/cards/claude_quota.py` | Claude subscription quota rings (5 min refresh) |
+| `payload/cards/cal.py` | iCal agenda card (1 min, minute-synced) |
 | `payload/menu.json` | KUAL menu — maps entries to launch commands |
 | `payload/tools/launch.sh` | Smart launcher: finds Python, loads env, detaches from KUAL via setsid |
 | `payload/tools/stop.sh` | Kills all running cards by PID file, then pkill fallback |
@@ -93,7 +96,11 @@ if __name__ == '__main__':
 | `BUIENALARM_POSTCODE` | buienradar | — |
 | `BUIENALARM_LAT` / `_LON` | buienradar | geocoded from postcode |
 | `ANTHROPIC_ADMIN_API_KEY` | claude_usage | — |
+| `CLAUDE_OAUTH_TOKEN` / `CLAUDE_REFRESH_TOKEN` | claude_quota | — |
+| `ICAL_URL`, `ICAL_URL_1..4` | cal | — |
+| `WORLD_CLOCK_TZ1..4` / `WORLD_CLOCK_CITY1..4` | worldclocks | — |
 | `SHELL_HOST` / `SHELL_PORT` | revshell | — |
+| `KDASH_DEBUG` | all cards — `log()` on-screen output | `true` |
 
 ## Testing
 

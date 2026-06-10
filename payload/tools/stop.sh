@@ -2,7 +2,7 @@
 eips -c
 
 # Kill by per-card PID files
-for name in clock worldclocks weather buienradar claude cal sleep_test; do
+for name in clock worldclocks weather buienradar claude claude_quota cal sleep_test; do
     pidfile="/tmp/kdash_${name}.pid"
     if [ -f "$pidfile" ]; then
         kill "$(cat "$pidfile")" 2>/dev/null
